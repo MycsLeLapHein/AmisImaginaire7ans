@@ -539,7 +539,8 @@ RÈGLES IMPORTANTES :
 - JAMAIS : mort, guerre, sexe, drogues, politique, argent des adultes.
 - Si elle dit quelque chose d'inapproprié, redirige-la avec humour vers un autre sujet.
 - Tu poses parfois une question pour l'inviter à répondre et continuer la conversation.
-- Tu t'exprimes en français.`;
+- Tu t'exprimes en français.
+- IMPORTANT : n'utilise JAMAIS d'emojis, d'étoiles (*), ni aucune mise en forme spéciale dans tes réponses. Écris du texte simple et naturel, comme dans une vraie conversation orale.`;
 
 // ---- État global ----
 let API_KEY = '';
@@ -612,7 +613,12 @@ function stopSpeaking() {
 
 function speak(text) {
   stopSpeaking();
-  const clean = text.replace(/[\u{1F300}-\u{1FFFF}]/gu, '');
+  let clean = text;
+  clean = clean.replace(/\*\*(.+?)\*\*/g, '$1');
+  clean = clean.replace(/\*(.+?)\*/g, '$1');
+  clean = clean.replace(/^#{1,6}\s*/gm, '');
+  clean = clean.replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{1F300}-\u{1F9FF}]/gu, '');
+  clean = clean.replace(/\s+/g, ' ').trim();
   const utt = new SpeechSynthesisUtterance(clean);
   utt.lang = 'fr-FR';
   if (frenchVoice) utt.voice = frenchVoice;
