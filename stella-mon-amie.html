@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Stella – Mon Amie</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Baloo+2:wght@400;600;800&display=swap');
+
+  :root {
+    --bg: #0d0e1a;
+    --surface: #161828;
+    --surface2: #1e2035;
+    --accent: #a78bfa;
+    --accent2: #60a5fa;
+    --accent3: #f472b6;
+    --gold: #fbbf24;
+    --text: #e2e8f0;
+    --text-muted: #94a3b8;
+    --radius: 20px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Stars background */
+  .stars {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+  }
+  .star {
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+    animation: twinkle var(--dur, 3s) var(--delay, 0s) infinite alternate ease-in-out;
+  }
+  @keyframes twinkle {
+    from { opacity: 0.1; transform: scale(1); }
+    to { opacity: 0.8; transform: scale(1.3); }
+  }
+
+  /* Setup overlay */
+  .setup-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(13,14,26,0.96);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  .setup-card {
+    background: var(--surface);
+    border: 1px solid rgba(167,139,250,0.3);
+    border-radius: 24px;
+    padding: 32px 28px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 0 60px rgba(167,139,250,0.15);
+  }
+  .setup-card .stella-big { font-size: 64px; margin-bottom: 8px; }
+  .setup-card h2 {
+    font-family: 'Baloo 2', cursive;
+    font-size: 1.8rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 6px;
+  }
+  .setup-card p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+  .setup-card label {
+    display: block;
+    text-align: left;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  .setup-card input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid rgba(167,139,250,0.3);
+    border-radius: 12px;
+    padding: 12px 16px;
+    color: var(--text);
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.95rem;
+    outline: none;
+    margin-bottom: 16px;
+    transition: border-color 0.2s;
+  }
+  .setup-card input:focus { border-color: var(--accent); }
+  .error-msg {
+    color: #f87171;
+    font-size: 0.85rem;
+    margin-bottom: 12px;
+    min-height: 20px;
+  }
+  .setup-btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: 14px;
+    border: none;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: white;
+    font-family: 'Baloo 2', cursive;
+    font-size: 1.1rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 4px 20px rgba(167,139,250,0.4);
+  }
+  .setup-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(167,139,250,0.5); }
+  .setup-btn:active { transform: translateY(0); }
+
+  /* Main layout */
+  .app-wrapper {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-width: 520px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px 10px;
+    flex-shrink: 0;
+  }
+  .stella-avatar {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #7c3aed, #2563eb);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px;
+    box-shadow: 0 0 20px rgba(124,58,237,0.5);
+    flex-shrink: 0;
+    position: relative;
+    overflow: visible;
+  }
+  .pulse-ring {
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    opacity: 0;
+    animation: none;
+  }
+  .pulse-ring.active {
+    animation: pulseRing 1.2s ease-in-out infinite;
+  }
+  @keyframes pulseRing {
+    0% { transform: scale(1); opacity: 0.8; }
+    100% { transform: scale(1.4); opacity: 0; }
+  }
+  .header-info h1 {
+    font-family: 'Baloo 2', cursive;
+    font-size: 1.3rem;
+    font-weight: 800;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .status-line {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 6px #4ade80;
+    flex-shrink: 0;
+  }
+
+  /* Chat area */
+  .chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 16px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(167,139,250,0.3) transparent;
+  }
+  .chat-area::-webkit-scrollbar { width: 4px; }
+  .chat-area::-webkit-scrollbar-track { background: transparent; }
+  .chat-area::-webkit-scrollbar-thumb { background: rgba(167,139,250,0.3); border-radius: 4px; }
+
+  /* Messages */
+  .msg {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    animation: fadeUp 0.3s ease-out;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .msg.user { flex-direction: row-reverse; }
+  .msg-avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #7c3aed, #2563eb);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .msg.user .msg-avatar {
+    background: linear-gradient(135deg, var(--accent3), #e879f9);
+  }
+  .bubble {
+    max-width: 78%;
+    padding: 11px 15px;
+    border-radius: 18px;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    font-weight: 600;
+  }
+  .msg.stella .bubble {
+    background: var(--surface);
+    border: 1px solid rgba(167,139,250,0.2);
+    border-bottom-left-radius: 4px;
+    color: var(--text);
+  }
+  .msg.user .bubble {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+
+  /* Thinking dots */
+  .thinking-dots {
+    display: none;
+    align-items: center;
+    gap: 8px;
+  }
+  .thinking-dots.show { display: flex; }
+  .thinking-dots .bubble {
+    display: flex;
+    gap: 5px;
+    padding: 14px 18px;
+    align-items: center;
+  }
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: bounce 1.2s ease-in-out infinite;
+  }
+  .dot:nth-child(2) { animation-delay: 0.2s; background: var(--accent2); }
+  .dot:nth-child(3) { animation-delay: 0.4s; background: var(--accent3); }
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-8px); }
+  }
+
+  /* Bottom area */
+  .bottom-area {
+    padding: 10px 16px 20px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* Quick actions */
+  .quick-actions {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+  .quick-actions::-webkit-scrollbar { display: none; }
+  .quick-btn {
+    flex-shrink: 0;
+    padding: 7px 14px;
+    border-radius: 20px;
+    border: 1px solid rgba(167,139,250,0.35);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .quick-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(167,139,250,0.1);
+  }
+
+  /* Mic section */
+  .mic-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .mic-btn {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(135deg, #7c3aed, #2563eb);
+    color: white;
+    font-size: 26px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 20px rgba(124,58,237,0.5);
+    transition: all 0.2s;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .mic-btn.recording {
+    background: linear-gradient(135deg, #dc2626, #e11d48);
+    animation: micPulse 1s ease-in-out infinite;
+    box-shadow: 0 4px 24px rgba(220,38,38,0.6);
+  }
+  .mic-btn.speaking {
+    background: linear-gradient(135deg, #059669, #0891b2);
+    box-shadow: 0 4px 24px rgba(5,150,105,0.6);
+  }
+  @keyframes micPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.07); }
+  }
+  .mic-btn:active { transform: scale(0.94); }
+
+  .mic-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .mic-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+  .audio-bars {
+    display: flex;
+    gap: 3px;
+    align-items: flex-end;
+    height: 20px;
+  }
+  .bar {
+    width: 4px;
+    border-radius: 2px;
+    background: var(--accent);
+    height: 4px;
+    transition: height 0.1s;
+  }
+  .audio-bars.active .bar {
+    animation: barAnim 0.6s ease-in-out infinite alternate;
+  }
+  .bar:nth-child(1) { animation-delay: 0s; }
+  .bar:nth-child(2) { animation-delay: 0.1s; }
+  .bar:nth-child(3) { animation-delay: 0.2s; }
+  .bar:nth-child(4) { animation-delay: 0.15s; }
+  .bar:nth-child(5) { animation-delay: 0.05s; }
+  @keyframes barAnim {
+    from { height: 3px; }
+    to { height: 20px; }
+  }
+
+  /* Mode no-speech */
+  .no-speech-warning {
+    display: none;
+    background: rgba(251,191,36,0.12);
+    border: 1px solid rgba(251,191,36,0.3);
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 0.82rem;
+    color: var(--gold);
+    text-align: center;
+  }
+
+  /* Fact badge */
+  .fact-badge {
+    background: linear-gradient(135deg, rgba(96,165,250,0.15), rgba(167,139,250,0.15));
+    border: 1px solid rgba(96,165,250,0.3);
+    border-radius: 12px;
+    padding: 8px 12px;
+    font-size: 0.78rem;
+    color: var(--accent2);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+</style>
+</head>
+<body>
+
+<!-- Stars -->
+<div class="stars" id="starsContainer"></div>
+
+<!-- Setup overlay -->
+<div class="setup-overlay" id="setupOverlay">
+  <div class="setup-card">
+    <div class="stella-big">🌟</div>
+    <h2>Stella – Mon Amie</h2>
+    <p>Entre ta clé API pour commencer à parler avec Stella, ton amie intelligente !</p>
+    <label>🔑 Clé API Claude</label>
+    <input type="password" id="apiKeyInput" placeholder="sk-ant-api..." autocomplete="off" />
+    <div class="error-msg" id="setupError"></div>
+    <button class="setup-btn" id="setupBtn">🚀 Lancer Stella !</button>
+  </div>
+</div>
+
+<!-- App -->
+<div class="app-wrapper">
+  <div class="header">
+    <div class="stella-avatar">
+      🌟
+      <div class="pulse-ring" id="pulseRing"></div>
+    </div>
+    <div class="header-info">
+      <h1>Stella</h1>
+      <div class="status-line">
+        <div class="status-dot"></div>
+        <span id="statusText">Prête à discuter !</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="chat-area" id="chatArea">
+    <!-- Thinking dots -->
+    <div class="thinking-dots msg stella" id="thinkingDots" style="display:none">
+      <div class="msg-avatar">🌟</div>
+      <div class="bubble">
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-area">
+    <div class="quick-actions" id="quickActions">
+      <button class="quick-btn" onclick="sendQuick('Raconte-moi quelque chose de fascinant !')">🔭 Fait insolite</button>
+      <button class="quick-btn" onclick="sendQuick('Pose-moi une devinette !')">🧩 Devinette</button>
+      <button class="quick-btn" onclick="sendQuick('Fais-moi une blague !')">😂 Blague</button>
+      <button class="quick-btn" onclick="sendQuick('On joue à un jeu de mots ?')">🎯 Jeu de mots</button>
+      <button class="quick-btn" onclick="sendQuick('Dis-moi quelque chose sur l\'espace !')">🚀 Espace</button>
+      <button class="quick-btn" onclick="sendQuick('Parle-moi d\'un animal bizarre !')">🦋 Animaux</button>
+    </div>
+
+    <div class="no-speech-warning" id="noSpeechWarning">
+      ⚠️ Micro non disponible. Clique sur le bouton pour écrire.
+    </div>
+
+    <div class="mic-section">
+      <button class="mic-btn" id="micBtn">🎙️</button>
+      <div class="mic-info">
+        <div class="mic-label" id="micLabel">Appuie pour parler</div>
+        <div class="audio-bars" id="audioBars">
+          <div class="bar"></div>
+          <div class="bar"></div>
+          <div class="bar"></div>
+          <div class="bar"></div>
+          <div class="bar"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- Stars ----
+(function() {
+  const c = document.getElementById('starsContainer');
+  for (let i = 0; i < 80; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 2.5 + 0.5;
+    s.style.cssText = `
+      width:${size}px;height:${size}px;
+      left:${Math.random()*100}%;top:${Math.random()*100}%;
+      --dur:${2+Math.random()*4}s;--delay:${Math.random()*4}s;
+    `;
+    c.appendChild(s);
+  }
+})();
+
+// ---- Prompt système pour 7 ans ----
+const SYSTEM_PROMPT = `Tu es Stella, une amie intelligente, curieuse et drôle pour une enfant de 7 ans.
+
+PERSONNALITÉ :
+- Tu es cool et enthousiaste, pas trop bébé.
+- Tu parles comme une meilleure amie : naturelle, fun, avec de l'humour.
+- Tu utilises quelques emojis (pas trop) pour donner de la vie à tes messages.
+- Tu es curieuse du monde et tu partages des infos fascinantes.
+
+CE QUE TU FAIS AVEC ELLE :
+- Tu racontes des faits insolites sur les animaux, l'espace, la nature, les sciences.
+- Tu proposes des devinettes et des énigmes logiques simples.
+- Tu fais des blagues adaptées (courtes, fun, pas stupides).
+- Tu joues aux jeux de mots.
+- Tu inventes de courtes histoires ensemble.
+- Tu réponds à ses questions sur le monde avec des explications claires et imagées.
+- Tu encourages sa curiosité et sa créativité.
+
+RÈGLES IMPORTANTES :
+- Tes réponses font 2 à 5 phrases maximum. Concises et dynamiques.
+- JAMAIS de contenu violent, effrayant, adulte, triste ou inapproprié.
+- JAMAIS : mort, guerre, sexe, drogues, politique, argent des adultes.
+- Si elle dit quelque chose d'inapproprié, redirige-la avec humour vers un autre sujet.
+- Tu poses parfois une question pour l'inviter à répondre et continuer la conversation.
+- Tu t'exprimes en français.`;
+
+// ---- State ----
+let API_KEY = '';
+let history = [];
+let isThinking = false;
+let isSpeaking = false;
+let isRecording = false;
+let synth = window.speechSynthesis;
+let currentUtterance = null;
+
+// ---- Setup ----
+const setupOverlay = document.getElementById('setupOverlay');
+const apiKeyInput  = document.getElementById('apiKeyInput');
+const setupBtn     = document.getElementById('setupBtn');
+const setupError   = document.getElementById('setupError');
+
+function tryLoadKey() {
+  const saved = localStorage.getItem('stella_api_key');
+  if (saved) { API_KEY = saved; setupOverlay.style.display = 'none'; init(); }
+}
+tryLoadKey();
+
+setupBtn.addEventListener('click', async () => {
+  const key = apiKeyInput.value.trim();
+  if (!key.startsWith('sk-ant-')) {
+    setupError.textContent = 'La clé doit commencer par sk-ant-';
+    return;
+  }
+  setupError.textContent = '';
+  setupBtn.textContent = '⏳ Vérification…';
+  setupBtn.disabled = true;
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 10, messages: [{ role: 'user', content: 'test' }] })
+    });
+    if (r.ok || r.status === 400) {
+      API_KEY = key;
+      localStorage.setItem('stella_api_key', key);
+      setupOverlay.style.display = 'none';
+      init();
+    } else {
+      setupError.textContent = 'Clé invalide, vérifie et réessaie !';
+    }
+  } catch(e) {
+    setupError.textContent = 'Erreur réseau. Réessaie.';
+  }
+  setupBtn.textContent = '🚀 Lancer Stella !';
+  setupBtn.disabled = false;
+});
+
+// ---- Init ----
+function init() {
+  addMessage('stella', "Hey ! Je suis Stella 🌟 Ta nouvelle amie super curieuse ! On peut parler de plein de trucs — des animaux incroyables, de l'espace, des devinettes, des blagues… Qu'est-ce qui te fait envie ? 🚀");
+  setupSpeech();
+}
+
+// ---- Chat ----
+const chatArea = document.getElementById('chatArea');
+const thinkingDots = document.getElementById('thinkingDots');
+
+function addMessage(who, text) {
+  const msg = document.createElement('div');
+  msg.className = `msg ${who}`;
+  const avatar = document.createElement('div');
+  avatar.className = 'msg-avatar';
+  avatar.textContent = who === 'stella' ? '🌟' : '👧';
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = text;
+  msg.appendChild(avatar);
+  msg.appendChild(bubble);
+  chatArea.insertBefore(msg, thinkingDots);
+  chatArea.scrollTop = chatArea.scrollHeight;
+}
+
+function setThinking(on) {
+  isThinking = on;
+  thinkingDots.style.display = on ? 'flex' : 'none';
+  if (on) {
+    chatArea.scrollTop = chatArea.scrollHeight;
+    document.getElementById('pulseRing').classList.add('active');
+  } else {
+    document.getElementById('pulseRing').classList.remove('active');
+  }
+}
+
+async function sendToAI(text) {
+  if (!text.trim() || isThinking) return;
+  addMessage('user', text);
+  history.push({ role: 'user', content: text });
+  setThinking(true);
+  setStatus('Stella réfléchit…');
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': API_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 300,
+        system: SYSTEM_PROMPT,
+        messages: history
+      })
+    });
+    const data = await res.json();
+    const reply = data.content?.[0]?.text || "Je n'ai pas bien compris, répète !";
+    history.push({ role: 'assistant', content: reply });
+    setThinking(false);
+    addMessage('stella', reply);
+    speak(reply);
+    setStatus('Prête à discuter !');
+  } catch(e) {
+    setThinking(false);
+    addMessage('stella', "Oups, j'ai eu un bug ! Réessaie 🌟");
+    setStatus('Prête à discuter !');
+  }
+}
+
+function sendQuick(text) {
+  if (isThinking || isSpeaking) return;
+  stopSpeaking();
+  sendToAI(text);
+}
+
+function setStatus(t) {
+  document.getElementById('statusText').textContent = t;
+}
+
+// ---- Speech synthesis ----
+let frenchVoice = null;
+
+function setupSpeech() {
+  function loadVoices() {
+    const voices = synth.getVoices();
+    frenchVoice = voices.find(v => v.lang === 'fr-FR' && v.name.toLowerCase().includes('thomas'))
+      || voices.find(v => v.lang === 'fr-FR' && !v.name.toLowerCase().includes('thomas'))
+      || voices.find(v => v.lang.startsWith('fr'))
+      || null;
+  }
+  loadVoices();
+  if (speechSynthesis.onvoiceschanged !== undefined) {
+    speechSynthesis.onvoiceschanged = loadVoices;
+  }
+}
+
+function speak(text) {
+  if (!synth) return;
+  stopSpeaking();
+  const clean = text.replace(/[🌟🚀🎯🧩😂🔭🦋✨🎉🔑⏳]/gu, '');
+  const utt = new SpeechSynthesisUtterance(clean);
+  utt.lang = 'fr-FR';
+  if (frenchVoice) utt.voice = frenchVoice;
+  utt.rate = 1.0;
+  utt.pitch = 1.1;
+  utt.volume = 1;
+  currentUtterance = utt;
+
+  utt.onstart = () => {
+    isSpeaking = true;
+    micBtn.classList.add('speaking');
+    micBtn.textContent = '🔊';
+    document.getElementById('micLabel').textContent = 'Stella parle…';
+    document.getElementById('audioBars').classList.add('active');
+    setStatus('Stella parle…');
+  };
+  utt.onend = utt.onerror = () => {
+    isSpeaking = false;
+    micBtn.classList.remove('speaking');
+    micBtn.textContent = '🎙️';
+    document.getElementById('micLabel').textContent = 'Appuie pour parler';
+    document.getElementById('audioBars').classList.remove('active');
+    setStatus('Prête à discuter !');
+    if (recognition && !isRecording) startListening();
+  };
+  synth.speak(utt);
+}
+
+function stopSpeaking() {
+  if (synth.speaking) synth.cancel();
+  isSpeaking = false;
+  micBtn.classList.remove('speaking');
+  micBtn.textContent = '🎙️';
+}
+
+// ---- Speech recognition ----
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+
+const micBtn    = document.getElementById('micBtn');
+const audioBars = document.getElementById('audioBars');
+
+if (!SR) {
+  document.getElementById('noSpeechWarning').style.display = 'block';
+}
+
+if (SR) {
+  recognition = new SR();
+  recognition.lang = 'fr-FR';
+  recognition.interimResults = false;
+  recognition.continuous = false;
+
+  recognition.onresult = async (e) => {
+    const text = e.results[0][0].transcript.trim();
+    stopRecording();
+    if (text) await sendToAI(text);
+    else startListening();
+  };
+
+  recognition.onerror = (e) => {
+    if (e.error === 'no-speech' || e.error === 'audio-capture') {
+      stopRecording();
+      if (!isSpeaking && !isThinking) startListening();
+      return;
+    }
+    stopRecording();
+    setStatus('Prête à discuter !');
+  };
+
+  recognition.onend = () => {
+    if (isRecording) {
+      stopRecording();
+      if (!isSpeaking && !isThinking) startListening();
+    }
+  };
+}
+
+function startListening() {
+  if (!recognition || isThinking || isSpeaking || isRecording) return;
+  try {
+    recognition.start();
+    isRecording = true;
+    micBtn.classList.add('recording');
+    micBtn.textContent = '🔴';
+    document.getElementById('micLabel').textContent = 'Je t\'écoute…';
+    audioBars.classList.add('active');
+    setStatus('En écoute…');
+  } catch(e) {}
+}
+
+function stopRecording() {
+  isRecording = false;
+  micBtn.classList.remove('recording');
+  micBtn.textContent = '🎙️';
+  document.getElementById('micLabel').textContent = 'Appuie pour parler';
+  audioBars.classList.remove('active');
+  try { recognition && recognition.abort(); } catch(e) {}
+}
+
+micBtn.addEventListener('click', () => {
+  if (isSpeaking) { stopSpeaking(); return; }
+  if (isThinking) return;
+  if (isRecording) stopRecording();
+  else startListening();
+});
+
+</script>
+</body>
+</html>
