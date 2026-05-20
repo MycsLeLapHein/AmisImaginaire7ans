@@ -510,16 +510,12 @@
     const s = document.createElement('div');
     s.className = 'star';
     const size = Math.random() * 2.5 + 0.5;
-    s.style.cssText = `
-      width:${size}px;height:${size}px;
-      left:${Math.random()*100}%;top:${Math.random()*100}%;
-      --dur:${2+Math.random()*4}s;--delay:${Math.random()*4}s;
-    `;
+    s.style.cssText = `width:${size}px;height:${size}px;left:${Math.random()*100}%;top:${Math.random()*100}%;--dur:${2+Math.random()*4}s;--delay:${Math.random()*4}s;`;
     c.appendChild(s);
   }
 })();
 
-// ---- Prompt système pour 7 ans ----
+// ---- Prompt ----
 const SYSTEM_PROMPT = `Tu es Stella, une amie intelligente, curieuse et drôle pour une enfant de 7 ans.
 
 PERSONNALITÉ :
@@ -545,98 +541,164 @@ RÈGLES IMPORTANTES :
 - Tu poses parfois une question pour l'inviter à répondre et continuer la conversation.
 - Tu t'exprimes en français.`;
 
-// ---- State ----
+// ---- État global ----
 let API_KEY = '';
 let history = [];
 let isThinking = false;
 let isSpeaking = false;
 let isRecording = false;
-let synth = window.speechSynthesis;
-let currentUtterance = null;
+let frenchVoice = null;
+let recognition = null;
+const synth = window.speechSynthesis;
 
-// ---- Setup ----
+// ---- DOM refs ----
+const micBtn       = document.getElementById('micBtn');
+const audioBars    = document.getElementById('audioBars');
+const chatArea     = document.getElementById('chatArea');
+const thinkingDots = document.getElementById('thinkingDots');
 const setupOverlay = document.getElementById('setupOverlay');
 const apiKeyInput  = document.getElementById('apiKeyInput');
 const setupBtn     = document.getElementById('setupBtn');
 const setupError   = document.getElementById('setupError');
 
-function tryLoadKey() {
-  const saved = localStorage.getItem('stella_api_key');
-  if (saved) { API_KEY = saved; setupOverlay.style.display = 'none'; init(); }
-}
-tryLoadKey();
-
-setupBtn.addEventListener('click', async () => {
-  const key = apiKeyInput.value.trim();
-  if (key.length < 20) {
-    setupError.textContent = 'La clé semble trop courte, vérifie !';
-    return;
-  }
-  setupError.textContent = '';
-  setupBtn.textContent = '⏳ Connexion…';
-  setupBtn.disabled = true;
-  try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 10, messages: [{ role: 'user', content: 'hi' }] })
-    });
-    // 401 = mauvaise clé, tout le reste (200, 400, 529...) = clé acceptée
-    if (r.status === 401) {
-      setupError.textContent = 'Clé invalide — vérifie qu\'elle est bien copiée en entier !';
-    } else {
-      API_KEY = key;
-      localStorage.setItem('stella_api_key', key);
-      setupOverlay.style.display = 'none';
-      init();
-    }
-  } catch(e) {
-    // Erreur réseau — on accepte quand même la clé pour ne pas bloquer
-    API_KEY = key;
-    localStorage.setItem('stella_api_key', key);
-    setupOverlay.style.display = 'none';
-    init();
-  }
-  setupBtn.textContent = '🚀 Lancer Stella !';
-  setupBtn.disabled = false;
-});
-
-// ---- Init ----
-function init() {
-  addMessage('stella', "Hey ! Je suis Stella 🌟 Ta nouvelle amie super curieuse ! On peut parler de plein de trucs — des animaux incroyables, de l'espace, des devinettes, des blagues… Qu'est-ce qui te fait envie ? 🚀");
-  setupSpeech();
-}
-
-// ---- Chat ----
-const chatArea = document.getElementById('chatArea');
-const thinkingDots = document.getElementById('thinkingDots');
-
-function addMessage(who, text) {
-  const msg = document.createElement('div');
-  msg.className = `msg ${who}`;
-  const avatar = document.createElement('div');
-  avatar.className = 'msg-avatar';
-  avatar.textContent = who === 'stella' ? '🌟' : '👧';
-  const bubble = document.createElement('div');
-  bubble.className = 'bubble';
-  bubble.textContent = text;
-  msg.appendChild(avatar);
-  msg.appendChild(bubble);
-  chatArea.insertBefore(msg, thinkingDots);
-  chatArea.scrollTop = chatArea.scrollHeight;
+// ---- Helpers UI ----
+function setStatus(t) {
+  document.getElementById('statusText').textContent = t;
 }
 
 function setThinking(on) {
   isThinking = on;
   thinkingDots.style.display = on ? 'flex' : 'none';
-  if (on) {
-    chatArea.scrollTop = chatArea.scrollHeight;
-    document.getElementById('pulseRing').classList.add('active');
-  } else {
-    document.getElementById('pulseRing').classList.remove('active');
-  }
+  document.getElementById('pulseRing').classList.toggle('active', on);
+  if (on) chatArea.scrollTop = chatArea.scrollHeight;
 }
 
+function addMessage(who, text) {
+  const msg = document.createElement('div');
+  msg.className = 'msg ' + who;
+  const av = document.createElement('div');
+  av.className = 'msg-avatar';
+  av.textContent = who === 'stella' ? '🌟' : '👧';
+  const b = document.createElement('div');
+  b.className = 'bubble';
+  b.textContent = text;
+  msg.appendChild(av);
+  msg.appendChild(b);
+  chatArea.insertBefore(msg, thinkingDots);
+  chatArea.scrollTop = chatArea.scrollHeight;
+}
+
+// ---- Speech synthesis ----
+function loadVoices() {
+  const voices = synth.getVoices();
+  frenchVoice = voices.find(v => v.lang === 'fr-FR' && v.name.toLowerCase().includes('thomas'))
+    || voices.find(v => v.lang === 'fr-FR')
+    || voices.find(v => v.lang.startsWith('fr'))
+    || null;
+}
+loadVoices();
+if (speechSynthesis.onvoiceschanged !== undefined) {
+  speechSynthesis.onvoiceschanged = loadVoices;
+}
+
+function stopSpeaking() {
+  if (synth.speaking) synth.cancel();
+  isSpeaking = false;
+  micBtn.classList.remove('speaking');
+  micBtn.textContent = '🎙️';
+  document.getElementById('micLabel').textContent = 'Appuie pour parler';
+  audioBars.classList.remove('active');
+}
+
+function speak(text) {
+  stopSpeaking();
+  const clean = text.replace(/[\u{1F300}-\u{1FFFF}]/gu, '');
+  const utt = new SpeechSynthesisUtterance(clean);
+  utt.lang = 'fr-FR';
+  if (frenchVoice) utt.voice = frenchVoice;
+  utt.rate = 1.0;
+  utt.pitch = 1.1;
+  utt.volume = 1;
+
+  utt.onstart = () => {
+    isSpeaking = true;
+    micBtn.classList.add('speaking');
+    micBtn.textContent = '🔊';
+    document.getElementById('micLabel').textContent = 'Stella parle…';
+    audioBars.classList.add('active');
+    setStatus('Stella parle…');
+  };
+  utt.onend = () => {
+    stopSpeaking();
+    setStatus('Prête à discuter !');
+    if (!isRecording) startListening();
+  };
+  utt.onerror = () => {
+    stopSpeaking();
+    setStatus('Prête à discuter !');
+    if (!isRecording) startListening();
+  };
+  synth.speak(utt);
+}
+
+// ---- Speech recognition ----
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+if (!SR) {
+  document.getElementById('noSpeechWarning').style.display = 'block';
+} else {
+  recognition = new SR();
+  recognition.lang = 'fr-FR';
+  recognition.interimResults = false;
+  recognition.continuous = false;
+
+  recognition.onresult = async (e) => {
+    const text = e.results[0][0].transcript.trim();
+    stopRecording();
+    if (text) await sendToAI(text);
+    else startListening();
+  };
+
+  recognition.onerror = (e) => {
+    stopRecording();
+    if (!isSpeaking && !isThinking) startListening();
+  };
+
+  recognition.onend = () => {
+    if (isRecording) stopRecording();
+  };
+}
+
+function startListening() {
+  if (!recognition || isThinking || isSpeaking || isRecording) return;
+  try {
+    recognition.start();
+    isRecording = true;
+    micBtn.classList.add('recording');
+    micBtn.textContent = '🔴';
+    document.getElementById('micLabel').textContent = "Je t'écoute…";
+    audioBars.classList.add('active');
+    setStatus('En écoute…');
+  } catch(e) {}
+}
+
+function stopRecording() {
+  isRecording = false;
+  micBtn.classList.remove('recording');
+  micBtn.textContent = '🎙️';
+  document.getElementById('micLabel').textContent = 'Appuie pour parler';
+  audioBars.classList.remove('active');
+  try { if (recognition) recognition.abort(); } catch(e) {}
+}
+
+micBtn.addEventListener('click', () => {
+  if (isSpeaking) { stopSpeaking(); return; }
+  if (isThinking) return;
+  if (isRecording) stopRecording();
+  else startListening();
+});
+
+// ---- API Claude ----
 async function sendToAI(text) {
   if (!text.trim() || isThinking) return;
   addMessage('user', text);
@@ -661,7 +723,8 @@ async function sendToAI(text) {
       })
     });
     const data = await res.json();
-    const reply = data.content?.[0]?.text || "Je n'ai pas bien compris, répète !";
+    const reply = data?.content?.[0]?.text;
+    if (!reply) throw new Error('no reply');
     history.push({ role: 'assistant', content: reply });
     setThinking(false);
     addMessage('stella', reply);
@@ -669,7 +732,8 @@ async function sendToAI(text) {
     setStatus('Prête à discuter !');
   } catch(e) {
     setThinking(false);
-    addMessage('stella', "Oups, j'ai eu un bug ! Réessaie 🌟");
+    const err = "Oups, j'ai eu un problème de connexion ! Réessaie 🌟";
+    addMessage('stella', err);
     setStatus('Prête à discuter !');
   }
 }
@@ -680,137 +744,57 @@ function sendQuick(text) {
   sendToAI(text);
 }
 
-function setStatus(t) {
-  document.getElementById('statusText').textContent = t;
+// ---- Setup clé API ----
+function tryLoadKey() {
+  const saved = localStorage.getItem('stella_api_key');
+  if (saved) { API_KEY = saved; setupOverlay.style.display = 'none'; init(); }
 }
 
-// ---- Speech synthesis ----
-let frenchVoice = null;
-
-function setupSpeech() {
-  function loadVoices() {
-    const voices = synth.getVoices();
-    frenchVoice = voices.find(v => v.lang === 'fr-FR' && v.name.toLowerCase().includes('thomas'))
-      || voices.find(v => v.lang === 'fr-FR' && !v.name.toLowerCase().includes('thomas'))
-      || voices.find(v => v.lang.startsWith('fr'))
-      || null;
+setupBtn.addEventListener('click', async () => {
+  const key = apiKeyInput.value.trim();
+  if (key.length < 20) {
+    setupError.textContent = 'La clé semble trop courte, vérifie !';
+    return;
   }
-  loadVoices();
-  if (speechSynthesis.onvoiceschanged !== undefined) {
-    speechSynthesis.onvoiceschanged = loadVoices;
-  }
-}
-
-function speak(text) {
-  if (!synth) return;
-  stopSpeaking();
-  const clean = text.replace(/[🌟🚀🎯🧩😂🔭🦋✨🎉🔑⏳]/gu, '');
-  const utt = new SpeechSynthesisUtterance(clean);
-  utt.lang = 'fr-FR';
-  if (frenchVoice) utt.voice = frenchVoice;
-  utt.rate = 1.0;
-  utt.pitch = 1.1;
-  utt.volume = 1;
-  currentUtterance = utt;
-
-  utt.onstart = () => {
-    isSpeaking = true;
-    micBtn.classList.add('speaking');
-    micBtn.textContent = '🔊';
-    document.getElementById('micLabel').textContent = 'Stella parle…';
-    document.getElementById('audioBars').classList.add('active');
-    setStatus('Stella parle…');
-  };
-  utt.onend = utt.onerror = () => {
-    isSpeaking = false;
-    micBtn.classList.remove('speaking');
-    micBtn.textContent = '🎙️';
-    document.getElementById('micLabel').textContent = 'Appuie pour parler';
-    document.getElementById('audioBars').classList.remove('active');
-    setStatus('Prête à discuter !');
-    if (recognition && !isRecording) startListening();
-  };
-  synth.speak(utt);
-}
-
-function stopSpeaking() {
-  if (synth.speaking) synth.cancel();
-  isSpeaking = false;
-  micBtn.classList.remove('speaking');
-  micBtn.textContent = '🎙️';
-}
-
-// ---- Speech recognition ----
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recognition = null;
-
-const micBtn    = document.getElementById('micBtn');
-const audioBars = document.getElementById('audioBars');
-
-if (!SR) {
-  document.getElementById('noSpeechWarning').style.display = 'block';
-}
-
-if (SR) {
-  recognition = new SR();
-  recognition.lang = 'fr-FR';
-  recognition.interimResults = false;
-  recognition.continuous = false;
-
-  recognition.onresult = async (e) => {
-    const text = e.results[0][0].transcript.trim();
-    stopRecording();
-    if (text) await sendToAI(text);
-    else startListening();
-  };
-
-  recognition.onerror = (e) => {
-    if (e.error === 'no-speech' || e.error === 'audio-capture') {
-      stopRecording();
-      if (!isSpeaking && !isThinking) startListening();
-      return;
-    }
-    stopRecording();
-    setStatus('Prête à discuter !');
-  };
-
-  recognition.onend = () => {
-    if (isRecording) {
-      stopRecording();
-      if (!isSpeaking && !isThinking) startListening();
-    }
-  };
-}
-
-function startListening() {
-  if (!recognition || isThinking || isSpeaking || isRecording) return;
+  setupError.textContent = '';
+  setupBtn.textContent = '⏳ Connexion…';
+  setupBtn.disabled = true;
   try {
-    recognition.start();
-    isRecording = true;
-    micBtn.classList.add('recording');
-    micBtn.textContent = '🔴';
-    document.getElementById('micLabel').textContent = 'Je t\'écoute…';
-    audioBars.classList.add('active');
-    setStatus('En écoute…');
-  } catch(e) {}
-}
-
-function stopRecording() {
-  isRecording = false;
-  micBtn.classList.remove('recording');
-  micBtn.textContent = '🎙️';
-  document.getElementById('micLabel').textContent = 'Appuie pour parler';
-  audioBars.classList.remove('active');
-  try { recognition && recognition.abort(); } catch(e) {}
-}
-
-micBtn.addEventListener('click', () => {
-  if (isSpeaking) { stopSpeaking(); return; }
-  if (isThinking) return;
-  if (isRecording) stopRecording();
-  else startListening();
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 10, messages: [{ role: 'user', content: 'hi' }] })
+    });
+    if (r.status === 401) {
+      setupError.textContent = "Clé invalide — vérifie qu'elle est bien copiée en entier !";
+    } else {
+      API_KEY = key;
+      localStorage.setItem('stella_api_key', key);
+      setupOverlay.style.display = 'none';
+      init();
+    }
+  } catch(e) {
+    API_KEY = key;
+    localStorage.setItem('stella_api_key', key);
+    setupOverlay.style.display = 'none';
+    init();
+  }
+  setupBtn.textContent = '🚀 Lancer Stella !';
+  setupBtn.disabled = false;
 });
 
+// ---- Init ----
+function init() {
+  addMessage('stella', "Hey ! Je suis Stella 🌟 Ta nouvelle amie super curieuse ! On peut parler de plein de trucs — des animaux incroyables, de l'espace, des devinettes, des blagues… Qu'est-ce qui te fait envie ? 🚀");
+  startListening();
+}
+
+tryLoadKey();
 </script>
 </body>
 </html>
