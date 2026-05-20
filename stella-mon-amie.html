@@ -568,29 +568,34 @@ tryLoadKey();
 
 setupBtn.addEventListener('click', async () => {
   const key = apiKeyInput.value.trim();
-  if (!key.startsWith('sk-ant-')) {
-    setupError.textContent = 'La clé doit commencer par sk-ant-';
+  if (key.length < 20) {
+    setupError.textContent = 'La clé semble trop courte, vérifie !';
     return;
   }
   setupError.textContent = '';
-  setupBtn.textContent = '⏳ Vérification…';
+  setupBtn.textContent = '⏳ Connexion…';
   setupBtn.disabled = true;
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 10, messages: [{ role: 'user', content: 'test' }] })
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 10, messages: [{ role: 'user', content: 'hi' }] })
     });
-    if (r.ok || r.status === 400) {
+    // 401 = mauvaise clé, tout le reste (200, 400, 529...) = clé acceptée
+    if (r.status === 401) {
+      setupError.textContent = 'Clé invalide — vérifie qu\'elle est bien copiée en entier !';
+    } else {
       API_KEY = key;
       localStorage.setItem('stella_api_key', key);
       setupOverlay.style.display = 'none';
       init();
-    } else {
-      setupError.textContent = 'Clé invalide, vérifie et réessaie !';
     }
   } catch(e) {
-    setupError.textContent = 'Erreur réseau. Réessaie.';
+    // Erreur réseau — on accepte quand même la clé pour ne pas bloquer
+    API_KEY = key;
+    localStorage.setItem('stella_api_key', key);
+    setupOverlay.style.display = 'none';
+    init();
   }
   setupBtn.textContent = '🚀 Lancer Stella !';
   setupBtn.disabled = false;
